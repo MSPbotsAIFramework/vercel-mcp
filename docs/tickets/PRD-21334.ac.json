@@ -1,0 +1,185 @@
+[
+  {
+    "id": "TC1",
+    "ac": "AC10",
+    "type": "auto",
+    "text": "Given a request to any tool without X-Vercel-Access-Token, When the service handles it, Then it returns HTTP 401 with a body listing the required header(s), not a 500.",
+    "tests": ["tests/test_middleware.py::test_missing_access_token_header_returns_401"]
+  },
+  {
+    "id": "TC2",
+    "ac": "AC12",
+    "type": "auto",
+    "text": "Given tools/list is called, Then all 19 tools are present and destructive tools (cancel/delete deployment, remove domain, delete dns record, delete env var) are annotated destructiveHint=true while read tools are annotated readOnlyHint=true.",
+    "tests": ["tests/test_tools.py::test_tool_list_annotations_match_contract"]
+  },
+  {
+    "id": "TC3",
+    "ac": "AC1",
+    "type": "manual",
+    "text": "Given a valid Vercel access token, When the agent calls vercel_list_projects, Then it returns the tenant's real Vercel projects (name, id, framework, latest production deployment).",
+    "steps": [
+      "Obtain a real Vercel personal access token for a test account with at least one project",
+      "Call tools/call vercel_list_projects with X-Vercel-Access-Token set to that token",
+      "Inspect the returned project list"
+    ],
+    "expect": "Response contains the account's actual projects with name, id, framework, and latest production deployment fields; no error.",
+    "result": "untested",
+    "evidence": "needs a real vendor account (no Vercel test account available during design/dev)"
+  },
+  {
+    "id": "TC4",
+    "ac": "AC2",
+    "type": "manual",
+    "text": "Given a project with multiple deployments, When the agent calls vercel_list_deployments with a limit, Then deployments are returned newest-first and capped at that limit.",
+    "steps": [
+      "Call vercel_list_deployments for a project known to have more than 5 deployments, with limit=5",
+      "Check the order and count of the returned list"
+    ],
+    "expect": "Exactly 5 deployments returned, ordered newest-first by created time.",
+    "result": "untested",
+    "evidence": "needs a real vendor account"
+  },
+  {
+    "id": "TC5",
+    "ac": "AC3",
+    "type": "manual",
+    "text": "Given a project and a git ref, When the agent calls vercel_create_deployment, Then Vercel starts a new deployment and the tool returns its id, url, and initial state.",
+    "steps": [
+      "Call vercel_create_deployment with a real project id and a valid git ref",
+      "Check the tool's response and cross-check in the Vercel dashboard"
+    ],
+    "expect": "Tool response includes a deployment id, url, and a state such as QUEUED or BUILDING; the deployment also appears in the Vercel dashboard.",
+    "result": "untested",
+    "evidence": "needs a real vendor account; write operation, run on a disposable test project only"
+  },
+  {
+    "id": "TC6",
+    "ac": "AC4",
+    "type": "manual",
+    "text": "Given a deployment that is queued or building, When the agent calls vercel_cancel_deployment then calls it again on the same (now finished/canceled) deployment, Then the first call stops it and the second call returns a structured error, not a crash.",
+    "steps": [
+      "Trigger a deployment and immediately call vercel_cancel_deployment on it",
+      "Call vercel_cancel_deployment again on the same deployment id"
+    ],
+    "expect": "First call reports a CANCELED state; second call returns the structured error envelope (invalid_argument or not_found), not a 500 or stack trace.",
+    "result": "untested",
+    "evidence": "needs a real vendor account"
+  },
+  {
+    "id": "TC7",
+    "ac": "AC5",
+    "type": "manual",
+    "text": "Given a project and a deployment id belonging to it, When the agent calls vercel_promote_deployment, Then production traffic points at that deployment and the tool confirms the new production deployment id.",
+    "steps": [
+      "Call vercel_promote_deployment with a project id and an existing (non-current-production) deployment id",
+      "Check the project's production deployment in the Vercel dashboard"
+    ],
+    "expect": "Tool response confirms the new production deployment id; the Vercel dashboard shows the same deployment as production.",
+    "result": "untested",
+    "evidence": "needs a real vendor account; run on a disposable test project only"
+  },
+  {
+    "id": "TC8",
+    "ac": "AC6",
+    "type": "manual",
+    "text": "Given a project, When the agent adds a domain, lists domains, removes the domain, and lists again, Then the domain appears then disappears; adding an already-attached domain returns a structured error.",
+    "steps": [
+      "Call vercel_add_project_domain with a test domain",
+      "Call vercel_list_domains and confirm the domain is present",
+      "Call vercel_remove_project_domain for the same domain",
+      "Call vercel_list_domains again and confirm it is gone",
+      "Call vercel_add_project_domain again with a domain already attached to a different project"
+    ],
+    "expect": "Domain appears after add, disappears after remove; the duplicate-attach attempt returns a structured error, not a silent success.",
+    "result": "untested",
+    "evidence": "needs a real vendor account and a test domain"
+  },
+  {
+    "id": "TC9",
+    "ac": "AC7",
+    "type": "manual",
+    "text": "Given a domain managed through this connector, When the agent creates a DNS record, lists records, then deletes it, Then the record appears then disappears in Vercel's DNS zone for that domain.",
+    "steps": [
+      "Call vercel_create_dns_record for a test TXT or A record on a domain already attached via this connector",
+      "Call vercel_list_dns_records and confirm the record is present",
+      "Call vercel_delete_dns_record for that record id",
+      "Call vercel_list_dns_records again and confirm it is gone"
+    ],
+    "expect": "Record appears after create, disappears after delete.",
+    "result": "untested",
+    "evidence": "needs a real vendor account and a test domain"
+  },
+  {
+    "id": "TC10",
+    "ac": "AC8",
+    "type": "auto",
+    "text": "Given a mocked Vercel response for the env-vars list endpoint that includes a value field, When vercel_list_env_vars processes it, Then the tool's output never contains a value key for any entry.",
+    "tests": ["tests/test_tools.py::test_list_env_vars_never_returns_decrypted_value"]
+  },
+  {
+    "id": "TC11",
+    "ac": "AC9",
+    "type": "manual",
+    "text": "Given a project, When the agent creates an environment variable and then deletes it by id, Then the create response confirms id/name/targets without the value, and the delete removes it.",
+    "steps": [
+      "Call vercel_create_env_var with name=TEST_VAR, value=some-secret, target=[preview]",
+      "Inspect the create response",
+      "Call vercel_list_env_vars and confirm TEST_VAR is present (no value field)",
+      "Call vercel_delete_env_var with the returned id",
+      "Call vercel_list_env_vars again and confirm TEST_VAR is gone"
+    ],
+    "expect": "Create response has id/name/targets, no value field anywhere; variable disappears after delete.",
+    "result": "untested",
+    "evidence": "needs a real vendor account; use a disposable test project only, never a value that matters"
+  },
+  {
+    "id": "TC12",
+    "ac": "AC11",
+    "type": "auto",
+    "text": "Given two concurrent fake requests carrying different X-Vercel-Access-Token/X-Vercel-Team-Id header values, When each calls a tool, Then each outbound call to Vercel carries only its own request's header-derived token/team, never the other request's.",
+    "tests": ["tests/test_middleware.py::test_concurrent_requests_do_not_leak_credentials_across_contextvars"]
+  },
+  {
+    "id": "TC13",
+    "ac": "AC11",
+    "type": "manual",
+    "text": "Given a request with only the access-token header vs. a request that also carries a team-id header, When each calls vercel_list_projects, Then the first operates on the token owner's personal account and the second operates on the named team only.",
+    "steps": [
+      "Call vercel_list_projects with only X-Vercel-Access-Token (personal account token)",
+      "Call vercel_list_projects with the same or a different token plus X-Vercel-Team-Id set to a real team id",
+      "Compare the two project lists"
+    ],
+    "expect": "Personal-account call returns only personal projects; team-scoped call returns only that team's projects; no overlap/leak between the two beyond what is genuinely shared.",
+    "result": "untested",
+    "evidence": "needs two real Vercel accounts/teams"
+  },
+  {
+    "id": "TC14",
+    "ac": "AC10",
+    "type": "auto",
+    "text": "Given a mocked 404 response from Vercel for an unknown deployment id, When vercel_get_deployment or vercel_cancel_deployment is called, Then the tool returns the structured error envelope with code not_found, not a raw passthrough or an unhandled exception.",
+    "tests": ["tests/test_tools.py::test_upstream_404_maps_to_structured_not_found"]
+  },
+  {
+    "id": "TC15",
+    "ac": "AC10",
+    "type": "auto",
+    "text": "Given a mocked 429 response from Vercel with a Retry-After header, When a tool call hits it, Then the client retries with backoff honoring Retry-After and, once retries are exhausted, returns the structured error envelope with code rate_limited and retryable=true.",
+    "tests": ["tests/test_client.py::test_429_retried_with_backoff_then_rate_limited_error"]
+  },
+  {
+    "id": "TC16",
+    "ac": "AC13",
+    "type": "manual",
+    "text": "Given the service is running but egress to api.vercel.com is blocked, When GET /health is called without any credential header, Then it still returns 200 {\"status\":\"ok\"}.",
+    "steps": [
+      "Start the service locally",
+      "Block or stub out egress to api.vercel.com (e.g. via a firewall rule or DNS override)",
+      "curl GET /health with no headers"
+    ],
+    "expect": "HTTP 200 with body {\"status\":\"ok\"}, returned without attempting to reach Vercel.",
+    "result": "untested",
+    "evidence": "needs a local run (not a real Vercel account); deferred to dev leg's self-test"
+  }
+]
