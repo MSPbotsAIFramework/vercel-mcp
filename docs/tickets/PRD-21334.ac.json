@@ -4,14 +4,18 @@
     "ac": "AC10",
     "type": "auto",
     "text": "Given a request to any tool without X-Vercel-Access-Token, When the service handles it, Then it returns HTTP 401 with a body listing the required header(s), not a 500.",
-    "tests": ["tests/test_middleware.py::test_missing_access_token_header_returns_401"]
+    "tests": ["tests/test_middleware.py::test_missing_access_token_header_returns_401"],
+    "result": "pass",
+    "evidence": "uv run pytest tests/test_middleware.py::test_missing_access_token_header_returns_401 -> PASSED (dev/PRD-21334 @ 214b4d2); also verified live: curl -X POST http://127.0.0.1:8080/mcp (no header) -> HTTP 401 {\"error\":\"missing required header(s)\",\"required\":[\"X-Vercel-Access-Token\"]}"
   },
   {
     "id": "TC2",
     "ac": "AC12",
     "type": "auto",
     "text": "Given tools/list is called, Then all 19 tools are present and destructive tools (cancel/delete deployment, remove domain, delete dns record, delete env var) are annotated destructiveHint=true while read tools are annotated readOnlyHint=true.",
-    "tests": ["tests/test_tools.py::test_tool_list_annotations_match_contract"]
+    "tests": ["tests/test_tools.py::test_tool_list_annotations_match_contract"],
+    "result": "pass",
+    "evidence": "uv run pytest tests/test_tools.py::test_tool_list_annotations_match_contract -> PASSED; live tools/list via curl confirmed 19 tools (dev/PRD-21334 @ 214b4d2)"
   },
   {
     "id": "TC3",
@@ -115,7 +119,9 @@
     "ac": "AC8",
     "type": "auto",
     "text": "Given a mocked Vercel response for the env-vars list endpoint that includes a value field, When vercel_list_env_vars processes it, Then the tool's output never contains a value key for any entry.",
-    "tests": ["tests/test_tools.py::test_list_env_vars_never_returns_decrypted_value"]
+    "tests": ["tests/test_tools.py::test_list_env_vars_never_returns_decrypted_value"],
+    "result": "pass",
+    "evidence": "uv run pytest tests/test_tools.py::test_list_env_vars_never_returns_decrypted_value -> PASSED (mocked upstream includes value+decryptedValue; tool output asserted to omit both)"
   },
   {
     "id": "TC11",
@@ -138,7 +144,9 @@
     "ac": "AC11",
     "type": "auto",
     "text": "Given two concurrent fake requests carrying different X-Vercel-Access-Token/X-Vercel-Team-Id header values, When each calls a tool, Then each outbound call to Vercel carries only its own request's header-derived token/team, never the other request's.",
-    "tests": ["tests/test_middleware.py::test_concurrent_requests_do_not_leak_credentials_across_contextvars"]
+    "tests": ["tests/test_middleware.py::test_concurrent_requests_do_not_leak_credentials_across_contextvars"],
+    "result": "pass",
+    "evidence": "uv run pytest tests/test_middleware.py::test_concurrent_requests_do_not_leak_credentials_across_contextvars -> PASSED; two real concurrent asyncio tasks (token-A, token-B) with a forced 20ms interleave in the mocked Vercel handler, asserted both tokens seen with no cross-contamination"
   },
   {
     "id": "TC13",
@@ -159,14 +167,18 @@
     "ac": "AC10",
     "type": "auto",
     "text": "Given a mocked 404 response from Vercel for an unknown deployment id, When vercel_get_deployment or vercel_cancel_deployment is called, Then the tool returns the structured error envelope with code not_found, not a raw passthrough or an unhandled exception.",
-    "tests": ["tests/test_tools.py::test_upstream_404_maps_to_structured_not_found"]
+    "tests": ["tests/test_tools.py::test_upstream_404_maps_to_structured_not_found"],
+    "result": "pass",
+    "evidence": "uv run pytest tests/test_tools.py::test_upstream_404_maps_to_structured_not_found -> PASSED; also added tests/test_tools.py::test_cancel_on_already_finished_deployment_returns_structured_error_not_a_crash (mocked 400 -> invalid_argument envelope, not a crash) covering the TC6-style re-cancel scenario at the unit level"
   },
   {
     "id": "TC15",
     "ac": "AC10",
     "type": "auto",
     "text": "Given a mocked 429 response from Vercel with a Retry-After header, When a tool call hits it, Then the client retries with backoff honoring Retry-After and, once retries are exhausted, returns the structured error envelope with code rate_limited and retryable=true.",
-    "tests": ["tests/test_client.py::test_429_retried_with_backoff_then_rate_limited_error"]
+    "tests": ["tests/test_client.py::test_429_retried_with_backoff_then_rate_limited_error"],
+    "result": "pass",
+    "evidence": "uv run pytest tests/test_client.py::test_429_retried_with_backoff_then_rate_limited_error -> PASSED (3 attempts observed, matching MAX_RETRIES=2); tests/test_client.py::test_success_after_one_retryable_5xx also PASSED, covering the success-after-retry path"
   },
   {
     "id": "TC16",
@@ -179,7 +191,7 @@
       "curl GET /health with no headers"
     ],
     "expect": "HTTP 200 with body {\"status\":\"ok\"}, returned without attempting to reach Vercel.",
-    "result": "untested",
-    "evidence": "needs a local run (not a real Vercel account); deferred to dev leg's self-test"
+    "result": "pass",
+    "evidence": "Verified in dev leg's self-test (no egress blocking needed: server.py's health() handler has no call path to api.vercel.com at all -- code-level guarantee, not just a runtime observation). Live: docker run vercel-mcp:dev, curl http://127.0.0.1:18080/health -> HTTP 200 {\"status\":\"ok\"}; and uv run python -m vercel_mcp locally, curl http://127.0.0.1:8080/health -> HTTP 200 {\"status\":\"ok\"} (dev/PRD-21334 @ 214b4d2)"
   }
 ]
