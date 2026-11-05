@@ -65,3 +65,30 @@ None beyond the must-fix above.
    - Re-ran the exact cited scan, `grep -rnP '[\x{4e00}-\x{9fff}]' --exclude-dir=.git --exclude-dir=.venv .`, from the repo root: no output (clean; `grep` exit code 1).
    - This was a documentation-text-only change — `git status --porcelain` after the edit shows only `docs/tickets/PRD-21334-review.md`. Gates unaffected by the fix were re-verified rather than assumed: `uv sync --frozen` — "Checked 84 packages", no drift; `uv run pytest` — 10 passed, 0 failed (same count as rounds 1 and 2); README "MSPbots Connector" section re-diffed against `~/.claude/skills/vendor-mcp-development/reference/readme-connector-section.md` — still byte-identical as a substring of `README.md` (3155/3155 bytes against the current reference file; the reference file itself has grown from the 3151 bytes recorded in rounds 1–2 to 3155 bytes since then, which is a change to the skill's template, not to this repo — `README.md` has no diff in this round). No automated or manual test case in `PRD-21334.ac.json` targets this doc, so no case result changed.
    - Reviewed sha (round 2): e677298. Fix commit: see `docs(PRD-21334): fix review round 2 must-fix` on `dev/PRD-21334`.
+
+## Round 3 · 2026-11-05 · reviewed dev/PRD-21334 @ 6d8151b (base main @ d74a005)
+
+Status: frozen @ 6d8151b
+
+Verdict: approved
+
+### Scope
+
+Re-review per `legs/review.md` re-review rule: checked round 2's "Fixes" entry against the actual change, then read the full diff `e677298...6d8151b` (the only commit added since the round-2-reviewed sha). That diff touches exactly one file, `docs/tickets/PRD-21334-review.md` — it adds the `## Round 2` review section itself (committed as `0192f15`, carrying the round-2 findings and verdict) and the `### Fixes (round 2)` entry (committed as `6d8151b`, the dev fix). No source, test, or config file changed since round 1 (`64150f6`), so round 1's independent code verification (correctness, scope, reuse, security, tests, SOP §14 checklist — see Round 1 Scope above) still holds; not re-run in full, but the gates it depends on were re-verified below since `docs/` is the only thing that moved.
+
+Round 2's "Fixes (round 2)" entry checked against the actual diff:
+- Claim: the Findings paragraph that quoted the forbidden Chinese characters verbatim (then at line 54) was rephrased to describe the violation without reproducing the characters, pointing to the English rendering "review rework" instead. Verified: `docs/tickets/PRD-21334-review.md` as committed in `6d8151b` contains no non-English characters anywhere in the Round 2 section (or elsewhere).
+- Claim: re-ran `grep -rnP '[\x{4e00}-\x{9fff}]' --exclude-dir=.git --exclude-dir=.venv .`, no output. Re-ran independently on `dev/PRD-21334` @ `6d8151b` from the repo root: no output, exit code 1 — matches the claim. The repo is clean.
+- Claim: `uv sync --frozen` no drift, `uv run pytest` 10 passed/0 failed, README Connector section byte-identical to the current skill template. Re-verified independently this round: `uv sync --frozen` — "Checked 84 packages", no drift; `uv run pytest` — 10 passed, 0 failed, 3 warnings (pre-existing deprecation warnings from `starlette`/`fastmcp`/`authlib` dependencies, unrelated to this ticket's code); README's "MSPbots Connector" section located at byte offset 750 of `README.md` as an exact substring of the current `~/.claude/skills/vendor-mcp-development/reference/readme-connector-section.md` (3155/3155 bytes) — byte-identical, confirmed by direct substring comparison, not just `diff`'s exit code.
+
+### Findings
+
+No must-fix findings. The round-2 fix is accurate and complete: the repo-wide non-English-text violation first flagged in round 1 (and re-introduced once, in round 2, by the fix commit's own review-record prose) is now resolved and independently re-confirmed clean. No code, test, or config has changed since round 1's thorough verification, so that verification's conclusions (implementation matches the tech design's Change list and Data & API contract, credential handling isolated per-request with no module-level token storage, structured error envelope, correct tool annotations, non-root Docker image with healthcheck, no real credentials committed) still stand.
+
+### Suggestions
+
+None beyond what round 1 already noted (none) — brand-new repo, no dead code or parameter stacking to clean up, reuse of `fastmcp`/`httpx`/`pydantic-settings` matches house convention.
+
+### Conclusion
+
+3 rounds of review (2 docs-only must-fix findings, both about repeated introduction of non-English text in the review record itself while documenting the fix for the same rule, now resolved and independently re-verified clean). No must-fix findings against the actual connector implementation at any round — round 1's deep code verification found none, and no source/test/config file has changed since. Approved for merge into `main`, INT publish, and the connector wiki check.
